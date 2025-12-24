@@ -1,0 +1,142 @@
+const express = require('express');
+const pool = require('../config/database');
+const { auth } = require('../middleware/auth');
+
+const router = express.Router();
+
+// Get user's followers
+router.get('/followers/:userId', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.profile_photo, u.bio
+       FROM follows f
+       JOIN users u ON f.follower_id = u.id
+       WHERE f.following_id = $1
+       ORDER BY f.created_at DESC`,
+      [req.params.userId]
+    );
+
+    res.json({ followers: result.rows });
+  } catch (error) {
+    console.error('Get followers error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get user's following
+router.get('/following/:userId', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.profile_photo, u.bio
+       FROM follows f
+       JOIN users u ON f.following_id = u.id
+       WHERE f.follower_id = $1
+       ORDER BY f.created_at DESC`,
+      [req.params.userId]
+    );
+
+    res.json({ following: result.rows });
+  } catch (error) {
+    console.error('Get following error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Check if current user follows target user
+router.get('/status/:userId', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [req.user.id, req.params.userId]
+    );
+
+    res.json({ isFollowing: result.rows.length > 0 });
+  } catch (error) {
+    console.error('Get follow status error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Follow user
+router.post('/:userId', auth, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+
+    // Can't follow yourself
+    if (targetUserId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot follow yourself' });
+    }
+
+    // Check if already following
+    const existing = await pool.query(
+      'SELECT id FROM follows WHERE follower_id = $1 AND following_id = $2',
+      [req.user.id, targetUserId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Already following this user' });
+    }
+
+    // Create follow relationship
+    await pool.query(
+      'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)',
+      [req.user.id, targetUserId]
+    );
+
+    // Get updated counts
+    const followerCount = await pool.query(
+      'SELECT COUNT(*) FROM follows WHERE following_id = $1',
+      [targetUserId]
+    );
+
+    const followingCount = await pool.query(
+      'SELECT COUNT(*) FROM follows WHERE follower_id = $1',
+      [req.user.id]
+    );
+
+    res.json({ 
+      message: 'Successfully followed user',
+      followerCount: parseInt(followerCount.rows[0].count),
+      followingCount: parseInt(followingCount.rows[0].count)
+    });
+  } catch (error) {
+    console.error('Follow user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Unfollow user
+router.delete('/:userId', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM follows WHERE follower_id = $1 AND following_id = $2 RETURNING id',
+      [req.user.id, req.params.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Follow relationship not found' });
+    }
+
+    // Get updated counts
+    const followerCount = await pool.query(
+      'SELECT COUNT(*) FROM follows WHERE following_id = $1',
+      [req.params.userId]
+    );
+
+    const followingCount = await pool.query(
+      'SELECT COUNT(*) FROM follows WHERE follower_id = $1',
+      [req.user.id]
+    );
+
+    res.json({ 
+      message: 'Successfully unfollowed user',
+      followerCount: parseInt(followerCount.rows[0].count),
+      followingCount: parseInt(followingCount.rows[0].count)
+    });
+  } catch (error) {
+    console.error('Unfollow user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
