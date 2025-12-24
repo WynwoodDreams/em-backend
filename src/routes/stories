@@ -1,0 +1,104 @@
+const express = require('express');
+const pool = require('../config/database');
+const { auth } = require('../middleware/auth');
+
+const router = express.Router();
+
+// Get all active stories (not expired)
+router.get('/', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.*, 
+        u.name as user_name, 
+        u.profile_photo as user_photo
+       FROM stories s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.expires_at > NOW()
+       ORDER BY s.created_at DESC`
+    );
+
+    res.json({ stories: result.rows });
+  } catch (error) {
+    console.error('Get stories error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create story
+router.post('/', auth, async (req, res) => {
+  try {
+    const { media_url, media_type } = req.body;
+
+    if (!media_url || !media_type) {
+      return res.status(400).json({ error: 'Media URL and type are required' });
+    }
+
+    // Stories expire after 24 hours
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const result = await pool.query(
+      `INSERT INTO stories (user_id, media_url, media_type, expires_at)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [req.user.id, media_url, media_type, expiresAt]
+    );
+
+    // Get full story with user info
+    const fullStory = await pool.query(
+      `SELECT s.*, u.name as user_name, u.profile_photo as user_photo
+       FROM stories s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.id = $1`,
+      [result.rows[0].id]
+    );
+
+    res.status(201).json({ story: fullStory.rows[0] });
+  } catch (error) {
+    console.error('Create story error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Mark story as seen
+router.post('/:id/seen', auth, async (req, res) => {
+  try {
+    // Check if already seen
+    const existing = await pool.query(
+      'SELECT id FROM story_views WHERE story_id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+
+    if (existing.rows.length === 0) {
+      await pool.query(
+        'INSERT INTO story_views (story_id, user_id) VALUES ($1, $2)',
+        [req.params.id, req.user.id]
+      );
+    }
+
+    res.json({ message: 'Story marked as seen' });
+  } catch (error) {
+    console.error('Mark story seen error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete story (owner only)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM stories WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found or not authorized' });
+    }
+
+    res.json({ message: 'Story deleted successfully' });
+  } catch (error) {
+    console.error('Delete story error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
