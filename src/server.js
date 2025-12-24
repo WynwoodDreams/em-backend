@@ -12,6 +12,7 @@ const shopRoutes = require('./routes/shop');
 const uploadRoutes = require('./routes/upload');
 const storiesRoutes = require('./routes/stories');
 const followsRoutes = require('./routes/follows');
+const usersRoutes = require('./routes/users');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/shop', shopRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/stories', storiesRoutes);
 app.use('/api/follows', followsRoutes);
+app.use('/api/users', usersRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
