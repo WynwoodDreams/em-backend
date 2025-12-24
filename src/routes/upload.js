@@ -18,10 +18,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only images are allowed'));
+      cb(new Error('Only images and videos are allowed'));
     }
   }
 });
@@ -34,11 +34,15 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
     }
 
     const folder = req.body.folder || 'em-motorcycle';
+    const isVideo = req.file.mimetype.startsWith('video/');
 
     // Upload to Cloudinary
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder },
+        { 
+          folder,
+          resource_type: isVideo ? 'video' : 'image'
+        },
         (error, result) => {
           if (error) reject(error);
           else resolve(result);
