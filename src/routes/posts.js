@@ -13,7 +13,7 @@ router.get('/', auth, async (req, res) => {
     const result = await pool.query(
       `SELECT p.*, 
         u.name as author_name, 
-        u.profile_photo as author_photo,
+        COALESCE(u.profile_photo, 'https://ui-avatars.com/api/?name=' || REPLACE(u.name, ' ', '+') || '&background=random') as author_photo,
         (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comment_count
        FROM posts p
        JOIN users u ON p.user_id = u.id
@@ -35,7 +35,7 @@ router.get('/:id', auth, async (req, res) => {
     const postResult = await pool.query(
       `SELECT p.*, 
         u.name as author_name, 
-        u.profile_photo as author_photo
+        COALESCE(u.profile_photo, 'https://ui-avatars.com/api/?name=' || REPLACE(u.name, ' ', '+') || '&background=random') as author_photo
        FROM posts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
@@ -47,7 +47,8 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     const commentsResult = await pool.query(
-      `SELECT c.*, u.name as author_name, u.profile_photo as author_photo
+      `SELECT c.*, u.name as author_name, 
+        COALESCE(u.profile_photo, 'https://ui-avatars.com/api/?name=' || REPLACE(u.name, ' ', '+') || '&background=random') as author_photo
        FROM post_comments c
        JOIN users u ON c.user_id = u.id
        WHERE c.post_id = $1
@@ -68,22 +69,23 @@ router.get('/:id', auth, async (req, res) => {
 // Create post
 router.post('/', auth, async (req, res) => {
   try {
-    const { content, image } = req.body;
+    const { content, image, video } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: 'Content is required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO posts (user_id, content, image)
-       VALUES ($1, $2, $3)
+      `INSERT INTO posts (user_id, content, image, video)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [req.user.id, content, image]
+      [req.user.id, content, image || null, video || null]
     );
 
     // Get full post with author info
     const fullPost = await pool.query(
-      `SELECT p.*, u.name as author_name, u.profile_photo as author_photo
+      `SELECT p.*, u.name as author_name, 
+        COALESCE(u.profile_photo, 'https://ui-avatars.com/api/?name=' || REPLACE(u.name, ' ', '+') || '&background=random') as author_photo
        FROM posts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
