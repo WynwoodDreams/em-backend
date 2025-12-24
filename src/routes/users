@@ -1,0 +1,38 @@
+const express = require('express');
+const pool = require('../config/database');
+const { auth } = require('../middleware/auth');
+
+const router = express.Router();
+
+// Get user by ID
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.id, 
+        u.name, 
+        u.email, 
+        COALESCE(u.profile_photo, 'https://ui-avatars.com/api/?name=' || REPLACE(u.name, ' ', '+') || '&background=random') as profile_photo,
+        u.bio,
+        u.role,
+        u.created_at,
+        (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count,
+        (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count,
+        (SELECT COALESCE(SUM(distance), 0) FROM rides WHERE user_id = u.id) as total_miles
+       FROM users u
+       WHERE u.id = $1`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;
