@@ -11,6 +11,7 @@ const initDatabase = async () => {
       name VARCHAR(255),
       phone VARCHAR(50),
       profile_photo VARCHAR(500),
+      bio TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -104,6 +105,7 @@ const initDatabase = async () => {
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       image VARCHAR(500),
+      video VARCHAR(500),
       likes INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -115,6 +117,44 @@ const initDatabase = async () => {
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Post likes (track who liked what)
+    CREATE TABLE IF NOT EXISTS post_likes (
+      id SERIAL PRIMARY KEY,
+      post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(post_id, user_id)
+    );
+
+    -- Stories
+    CREATE TABLE IF NOT EXISTS stories (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      media_url VARCHAR(500) NOT NULL,
+      media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('image', 'video')),
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Story views (track who viewed what)
+    CREATE TABLE IF NOT EXISTS story_views (
+      id SERIAL PRIMARY KEY,
+      story_id INTEGER REFERENCES stories(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(story_id, user_id)
+    );
+
+    -- Follows (user relationships)
+    CREATE TABLE IF NOT EXISTS follows (
+      id SERIAL PRIMARY KEY,
+      follower_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      following_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(follower_id, following_id),
+      CHECK (follower_id != following_id)
     );
 
     -- Promotions (dealers)
@@ -174,6 +214,14 @@ const initDatabase = async () => {
       image VARCHAR(500),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Create indexes for better performance
+    CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id);
+    CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
+    CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
+    CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
   `;
 
   try {
