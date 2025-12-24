@@ -10,6 +10,8 @@ const ridesRoutes = require('./routes/rides');
 const postsRoutes = require('./routes/posts');
 const shopRoutes = require('./routes/shop');
 const uploadRoutes = require('./routes/upload');
+const storiesRoutes = require('./routes/stories');
+const followsRoutes = require('./routes/follows');
 
 const app = express();
 
@@ -46,6 +48,8 @@ app.use('/api/rides', ridesRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/stories', storiesRoutes);
+app.use('/api/follows', followsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -86,7 +90,6 @@ Available endpoints:
   POST   /api/bikes             - Add new bike
   PUT    /api/bikes/:id         - Update bike
   DELETE /api/bikes/:id         - Delete bike
-  POST   /api/bikes/:id/photos  - Add bike photo
 
   GET    /api/rides             - Get all rides
   POST   /api/rides             - Create ride
@@ -95,6 +98,19 @@ Available endpoints:
   GET    /api/posts             - Get community posts
   POST   /api/posts             - Create post
   POST   /api/posts/:id/like    - Like post
+  POST   /api/posts/:id/comments - Add comment
+  DELETE /api/posts/:id         - Delete post
+
+  GET    /api/stories           - Get active stories
+  POST   /api/stories           - Create story
+  POST   /api/stories/:id/seen  - Mark story as seen
+  DELETE /api/stories/:id       - Delete story
+
+  GET    /api/follows/followers/:userId  - Get followers
+  GET    /api/follows/following/:userId  - Get following
+  GET    /api/follows/status/:userId     - Check follow status
+  POST   /api/follows/:userId            - Follow user
+  DELETE /api/follows/:userId            - Unfollow user
 
   GET    /api/shop/profile      - Get shop profile (dealer)
   PUT    /api/shop/profile      - Update shop profile
